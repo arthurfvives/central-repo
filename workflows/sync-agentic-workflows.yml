@@ -1,0 +1,111 @@
+name: Sync Agentic Workflows
+
+# Runs automatically when aw-config.yml changes, or manually on demand.
+# Reads .github/aw-config.yml and fetches (or removes) compiled workflow
+# files from the central-repo based on the enabled/disabled flags.
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/aw-config.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Sync workflows from central-repo
+        env:
+          # Optional: set this secret when central-repo is private.
+          # For a public central-repo this can be left unset.
+          CENTRAL_REPO_TOKEN: ${{ secrets.CENTRAL_REPO_TOKEN }}
+        run: |
+          cat > /tmp/aw-sync.py << 'PYEOF'
+          import yaml, sys, os, urllib.request
+
+          config_path = '.github/aw-config.yml'
+          with open(config_path) as f:
+              config = yaml.safe_load(f)
+
+          central_repo = config.get('central-repo')
+          central_ref  = config.get('central-repo-ref', 'main')
+          if not central_repo:
+              print("ERROR: 'central-repo' is not set in aw-config.yml", file=sys.stderr)
+              sys.exit(1)
+
+          base_url = f"https://raw.githubusercontent.com/{central_repo}/{central_ref}"
+          token    = os.environ.get('CENTRAL_REPO_TOKEN', '')
+
+          def fetch(remote_path, local_dest):
+              url = f"{base_url}/{remote_path}"
+              req = urllib.request.Request(url)
+              if token:
+                  req.add_header('Authorization', f'token {token}')
+              try:
+                  with urllib.request.urlopen(req) as resp:
+                      data = resp.read()
+              except urllib.error.HTTPError as e:
+                  print(f"ERROR: could not fetch {url}: {e}", file=sys.stderr)
+                  sys.exit(1)
+              os.makedirs(os.path.dirname(local_dest), exist_ok=True)
+              with open(local_dest, 'wb') as f:
+                  f.write(data)
+
+          # Fetch catalog from central-repo
+          catalog_tmp = '/tmp/aw-catalog.yml'
+          fetch('catalog.yml', catalog_tmp)
+          with open(catalog_tmp) as f:
+              catalog = yaml.safe_load(f)
+
+          print(f"Central-repo : {central_repo}@{central_ref}")
+          print(f"Catalog      : {len(catalog.get('workflows', {}))} workflows available")
+          print()
+
+          for workflow, enabled in config.get('workflows', {}).items():
+              lock_dest = f".github/workflows/{workflow}.lock.yml"
+              md_dest   = f".github/workflows/{workflow}.md"
+
+              if enabled:
+                  entry = catalog.get('workflows', {}).get(workflow)
+                  if not entry:
+                      print(
+                          f"ERROR: workflow '{workflow}' is not listed in the central-repo catalog.",
+                          file=sys.stderr,
+                      )
+                      sys.exit(1)
+                  print(f"  [enable]  {workflow}")
+                  fetch(entry['compiled'], lock_dest)
+                  fetch(entry['source'],   md_dest)
+              else:
+                  removed = [p for p in [lock_dest, md_dest] if os.path.exists(p)]
+                  for p in removed:
+                      os.remove(p)
+                  status = "removed" if removed else "already absent"
+                  print(f"  [disable] {workflow} ({status})")
+          PYEOF
+          python3 /tmp/aw-sync.py
+
+      - name: Commit changes
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .github/workflows/
+          if git diff --staged --quiet; then
+            echo "No workflow changes to commit."
+          else
+            git commit -m "chore(aw): sync workflows from central-repo
+
+          Synced based on .github/aw-config.yml"
+            git push
+          fi

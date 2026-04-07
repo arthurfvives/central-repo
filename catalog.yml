@@ -1,0 +1,27 @@
+# Central catalog of available agentic workflows.
+# This file is read by the sync-agentic-workflows workflow in each project
+# to locate and distribute compiled workflow definitions.
+#
+# To add a new workflow:
+#   1. Add the .md source file under workflows/
+#   2. Compile it: gh aw compile .github/... (or place the compiled .lock.yml here)
+#   3. Register it in this catalog
+
+version: "1"
+
+workflows:
+  pr-documentation-review:
+    description: >
+      Reviews codebase documentation whenever a pull request is opened,
+      checking for missing, outdated, or incomplete docs and posting a
+      review comment.
+    source: workflows/pr-documentation-review.md
+    compiled: workflows/pr-documentation-review.lock.yml
+
+  daily-repo-status:
+    description: >
+      Creates daily repo status reports. Gathers recent repository activity
+      (issues, PRs, discussions, releases, code changes) and generates
+      GitHub issues with productivity insights and recommendations.
+    source: workflows/daily-repo-status.md
+    compiled: workflows/daily-repo-status.lock.yml
