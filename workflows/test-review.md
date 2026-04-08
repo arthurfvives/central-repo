@@ -3,7 +3,7 @@ description: Reviews test coverage and quality when triggered via '/test-review'
 on:
   slash_command:
     name: test-review
-    reaction: eyes
+  reaction: "eyes"
   workflow_call:
 permissions: read-all
 tools:
@@ -15,7 +15,7 @@ network:
     - node
 safe-outputs:
   add-comment:
-    max: 1
+    max: 3
     hide-older-comments: true
   noop: {}
 ---
