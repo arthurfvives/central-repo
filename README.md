@@ -8,12 +8,11 @@ Workflows are authored and maintained here. Project repos **install** them with 
 
 ```
 central-repo/
-└── .github/
-    └── workflows/
-        ├── pr-documentation-review.md        ← source (edit this)
-        ├── pr-documentation-review.lock.yml  ← compiled (generated)
-        ├── daily-repo-status.md
-        └── daily-repo-status.lock.yml
+└── workflows/
+    ├── pr-documentation-review.md        ← source (edit this)
+    ├── pr-documentation-review.lock.yml  ← compiled (generated)
+    ├── daily-repo-status.md
+    └── daily-repo-status.lock.yml
 ```
 
 ## Installing a workflow in a project
