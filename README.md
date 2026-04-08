@@ -9,10 +9,8 @@ Workflows are authored and maintained here. Project repos **install** them with 
 ```
 central-repo/
 └── workflows/
-    ├── pr-documentation-review.md        ← source (edit this)
-    ├── pr-documentation-review.lock.yml  ← compiled (generated)
-    ├── daily-repo-status.md
-    └── daily-repo-status.lock.yml
+    ├── pr-documentation-review.md
+    └── daily-repo-status.md
 ```
 
 ## Installing a workflow in a project
@@ -46,10 +44,8 @@ Updates are **explicit** — project owners decide when to adopt a new version.
 
 ## Adding a new workflow
 
-1. Create `.github/workflows/<name>.md` with frontmatter + natural language instructions
-2. Compile: `gh aw compile`
-3. Commit both `.md` and `.lock.yml`
-4. Projects install it with `gh aw add arthurfvives/central-repo/<name>`
+1. Create `workflows/<name>.md` with frontmatter + natural language instructions
+2. Commit — `gh aw add` compiles the lock file locally on install.
 
 ## Available workflows
 
