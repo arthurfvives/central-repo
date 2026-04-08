@@ -10,6 +10,8 @@ on:
       - main
     paths:
       - .github/aw-config.yml
+  schedule:
+    - cron: "17 5 * * *"
   workflow_dispatch:
 
 permissions:
@@ -25,6 +27,9 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Install Python dependency
+        run: python3 -m pip install --upgrade pyyaml
+
       - name: Sync workflows from central-repo
         env:
           # Optional: set this secret when central-repo is private.
@@ -32,7 +37,7 @@ jobs:
           CENTRAL_REPO_TOKEN: ${{ secrets.CENTRAL_REPO_TOKEN }}
         run: |
           cat > /tmp/aw-sync.py << 'PYEOF'
-          import yaml, sys, os, urllib.request
+          import yaml, sys, os, urllib.request, urllib.error
 
           config_path = '.github/aw-config.yml'
           with open(config_path) as f:
@@ -51,7 +56,7 @@ jobs:
               url = f"{base_url}/{remote_path}"
               req = urllib.request.Request(url)
               if token:
-                  req.add_header('Authorization', f'token {token}')
+                req.add_header('Authorization', f'Bearer {token}')
               try:
                   with urllib.request.urlopen(req) as resp:
                       data = resp.read()

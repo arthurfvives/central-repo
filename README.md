@@ -4,14 +4,20 @@ This repository is the **single source of truth** for all shared GitHub Agentic 
 
 ## How it works
 
+Note: gh-aw itself expects executable workflow pairs in `.github/workflows` (`*.md` + `*.lock.yml`).
+This repository is used as a central catalog/storage location, while project repositories sync selected workflows into their own `.github/workflows`.
+
 ```
 central-repo/                        ← You are here
 ├── catalog.yml                      ← Master list of available workflows
 └── workflows/
-    ├── pr-documentation-review.md         ← Source definition (edit this)
-    ├── pr-documentation-review.lock.yml   ← Compiled workflow (generated)
-    ├── daily-repo-status.md
-    └── daily-repo-status.lock.yml
+    ├── sync-agentic-workflows.yml            ← Reusable sync workflow template
+    ├── pr-documentation-review/
+    │   ├── pr-documentation-review.md        ← Source definition (edit this)
+    │   └── pr-documentation-review.lock.yml  ← Compiled workflow (generated)
+    └── daily-repo-status/
+        ├── daily-repo-status.md
+        └── daily-repo-status.lock.yml
 
 project-repo/
 └── .github/
@@ -21,7 +27,7 @@ project-repo/
         └── pr-documentation-review.lock.yml ← Auto-managed, do not edit
 ```
 
-When a project pushes a change to `.github/aw-config.yml`, the `sync-agentic-workflows` workflow:
+When a project triggers `sync-agentic-workflows` (on `.github/aw-config.yml` changes, daily schedule, or manual dispatch), it:
 1. Reads which workflows are enabled/disabled
 2. Downloads the compiled `.lock.yml` from this repository
 3. Commits the changes — the workflow is now active (or removed) in that project
@@ -48,11 +54,13 @@ workflows:
   daily-repo-status: false
 ```
 
-### 2. Copy `.github/workflows/sync-agentic-workflows.yml` from this repo
+### 2. Copy `workflows/sync-agentic-workflows.yml` from this repo
 
 See [sync-agentic-workflows.yml](workflows/sync-agentic-workflows.yml) for the template.
 
 ### 3. Push — the sync workflow runs automatically on config changes
+
+You can also run it manually via `workflow_dispatch`; the included template also has a daily scheduled sync.
 
 ## Available workflows
 
