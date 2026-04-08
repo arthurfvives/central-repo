@@ -1,11 +1,14 @@
 # Central catalog of available agentic workflows.
-# This file is read by the sync-agentic-workflows workflow in each project
-# to locate and distribute compiled workflow definitions.
+#
+# Compiled lock files live in .github/workflows/ of this repo and are
+# called by project repos via GitHub Actions workflow_call — nothing is
+# copied to the project. The sync-agentic-workflows workflow in each
+# project only creates/removes a tiny trigger file per enabled workflow.
 #
 # To add a new workflow:
-#   1. Add the .md source file under workflows/<workflow-name>/
-#   2. Compile it: gh aw compile .github/... (or place the compiled .lock.yml here)
-#   3. Register it in this catalog
+#   1. Add the .md source under .github/workflows/ (with workflow_call in on:)
+#   2. Run: gh aw compile  (generates the .lock.yml)
+#   3. Register it in this catalog with its trigger conditions
 
 version: "1"
 
@@ -15,13 +18,16 @@ workflows:
       Reviews codebase documentation whenever a pull request is opened,
       checking for missing, outdated, or incomplete docs and posting a
       review comment.
-    source: workflows/pr-documentation-review/pr-documentation-review.md
-    compiled: workflows/pr-documentation-review/pr-documentation-review.lock.yml
+    trigger:
+      pull_request:
+        types: [opened]
 
   daily-repo-status:
     description: >
       Creates daily repo status reports. Gathers recent repository activity
       (issues, PRs, discussions, releases, code changes) and generates
       GitHub issues with productivity insights and recommendations.
-    source: workflows/daily-repo-status/daily-repo-status.md
-    compiled: workflows/daily-repo-status/daily-repo-status.lock.yml
+    trigger:
+      schedule:
+        - cron: "28 12 * * *"
+      workflow_dispatch:

@@ -1,43 +1,57 @@
 # Central Agentic Workflows Repository
 
-This repository is the **single source of truth** for all shared GitHub Agentic Workflows (gh-aw). Projects opt in to specific workflows via a configuration file — no manual copy-pasting of complex YAML files.
+This repository is the **single source of truth** for all shared GitHub Agentic Workflows (gh-aw). Projects opt in to specific workflows via a one-line config change — **no workflow files are ever copied**.
 
 ## How it works
 
-Note: gh-aw itself expects executable workflow pairs in `.github/workflows` (`*.md` + `*.lock.yml`).
-This repository is used as a central catalog/storage location, while project repositories sync selected workflows into their own `.github/workflows`.
+Instead of copying the compiled `*.lock.yml` files (1000+ lines each) to every project, the workflows **stay here permanently**. Each project only has a tiny trigger file (~10 lines) that calls the central workflow via GitHub Actions' native `workflow_call`.
 
 ```
-central-repo/                        ← You are here
-├── catalog.yml                      ← Master list of available workflows
-└── workflows/
-    ├── sync-agentic-workflows.yml            ← Reusable sync workflow template
-    ├── pr-documentation-review/
-    │   ├── pr-documentation-review.md        ← Source definition (edit this)
-    │   └── pr-documentation-review.lock.yml  ← Compiled workflow (generated)
-    └── daily-repo-status/
+central-repo/                           ← You are here (arthurfvives/central-repo)
+├── catalog.yml                         ← Trigger definitions per workflow
+├── workflows/
+│   └── sync-agentic-workflows.yml      ← Template for project repos
+└── .github/
+    └── workflows/
+        ├── pr-documentation-review.md        ← Source (edit this)
+        ├── pr-documentation-review.lock.yml  ← Compiled (callable via workflow_call)
         ├── daily-repo-status.md
         └── daily-repo-status.lock.yml
 
 project-repo/
 └── .github/
-    ├── aw-config.yml                ← Opt-in config (edit this per project)
+    ├── aw-config.yml                   ← Opt-in config (only file you edit)
     └── workflows/
-        ├── sync-agentic-workflows.yml      ← Fetches from central-repo
-        └── pr-documentation-review.lock.yml ← Auto-managed, do not edit
+        ├── sync-agentic-workflows.yml  ← Generates/removes trigger files
+        └── pr-documentation-review.yml ← AUTO-GENERATED tiny trigger (~10 lines)
 ```
 
-When a project triggers `sync-agentic-workflows` (on `.github/aw-config.yml` changes, daily schedule, or manual dispatch), it:
-1. Reads which workflows are enabled/disabled
-2. Downloads the compiled `.lock.yml` from this repository
-3. Commits the changes — the workflow is now active (or removed) in that project
+When a project enables a workflow in `aw-config.yml`, the `sync-agentic-workflows` workflow creates a trigger file like this:
+
+```yaml
+name: "Reviews codebase documentation..."
+
+"on":
+  pull_request:
+    types: [opened]
+
+jobs:
+  run:
+    uses: arthurfvives/central-repo/.github/workflows/pr-documentation-review.lock.yml@main
+    secrets: inherit
+```
+
+That is the **entire file** — the actual workflow logic runs in this central repo.
 
 ## Adding or updating a workflow
 
-1. Edit (or create) the `.md` source definition under `workflows/`
-2. Compile it from your project: `gh aw compile` (then copy the output here), or compile directly if the `gh aw` CLI is set up for this repo
-3. Commit both the `.md` and the updated `.lock.yml`
-4. Projects will receive the update the next time their sync workflow runs
+1. Edit (or create) the `.md` source in `.github/workflows/`
+2. Compile: `gh aw compile` (generates the `.lock.yml`)
+3. Register the trigger in `catalog.yml`
+4. Commit — all projects pick up the change on their next sync (daily or manual)
+
+> **Note:** The `workflow_call:` trigger was added manually to the existing lock files.
+> After running `gh aw compile` in this repo, the lock files will be fully regenerated and the metadata hash will be correct.
 
 ## Project setup
 
@@ -54,13 +68,19 @@ workflows:
   daily-repo-status: false
 ```
 
-### 2. Copy `workflows/sync-agentic-workflows.yml` from this repo
+### 2. Copy `workflows/sync-agentic-workflows.yml` into `.github/workflows/`
 
 See [sync-agentic-workflows.yml](workflows/sync-agentic-workflows.yml) for the template.
 
-### 3. Push — the sync workflow runs automatically on config changes
+### 3. Push — trigger files are generated automatically
 
-You can also run it manually via `workflow_dispatch`; the included template also has a daily scheduled sync.
+Run the sync manually the first time via `workflow_dispatch` or just push `aw-config.yml`.
+
+### Requirements
+
+- `central-repo` must be **public** or **internal** within your organisation (GitHub Actions `workflow_call` requirement).
+- Each project needs its own `COPILOT_GITHUB_TOKEN` secret — billing goes to the calling repo's token.
+- If `central-repo` is private: grant Actions access under _Settings → Actions → General → Access_ and set the `CENTRAL_REPO_TOKEN` secret in the project.
 
 ## Available workflows
 
@@ -68,3 +88,4 @@ You can also run it manually via `workflow_dispatch`; the included template also
 |------|-------------|
 | `pr-documentation-review` | Reviews documentation quality on every opened PR |
 | `daily-repo-status` | Posts a daily GitHub Issue summarising repository activity |
+

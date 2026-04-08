@@ -1,8 +1,11 @@
 name: Sync Agentic Workflows
 
-# Runs automatically when aw-config.yml changes, or manually on demand.
-# Reads .github/aw-config.yml and fetches (or removes) compiled workflow
-# files from the central-repo based on the enabled/disabled flags.
+# Runs when aw-config.yml changes, daily (picks up updates in central-repo),
+# or on manual dispatch.
+#
+# For each enabled workflow it creates a tiny trigger file that calls the
+# compiled workflow in central-repo via workflow_call — nothing is copied.
+# For disabled workflows it removes the trigger file.
 
 on:
   push:
@@ -27,79 +30,86 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Install Python dependency
-        run: python3 -m pip install --upgrade pyyaml
+      - name: Install PyYAML
+        run: python3 -m pip install --quiet pyyaml
 
-      - name: Sync workflows from central-repo
+      - name: Generate trigger files
         env:
-          # Optional: set this secret when central-repo is private.
-          # For a public central-repo this can be left unset.
+          # Optional: set when central-repo is private
           CENTRAL_REPO_TOKEN: ${{ secrets.CENTRAL_REPO_TOKEN }}
         run: |
-          cat > /tmp/aw-sync.py << 'PYEOF'
-          import yaml, sys, os, urllib.request, urllib.error
+          python3 - << 'PYEOF'
+          import yaml, sys, os, textwrap, urllib.request, urllib.error
 
-          config_path = '.github/aw-config.yml'
-          with open(config_path) as f:
+          # ── Read project config ─────────────────────────────────────────────
+          with open('.github/aw-config.yml') as f:
               config = yaml.safe_load(f)
 
           central_repo = config.get('central-repo')
           central_ref  = config.get('central-repo-ref', 'main')
           if not central_repo:
-              print("ERROR: 'central-repo' is not set in aw-config.yml", file=sys.stderr)
+              print("ERROR: 'central-repo' not set in aw-config.yml", file=sys.stderr)
               sys.exit(1)
 
-          base_url = f"https://raw.githubusercontent.com/{central_repo}/{central_ref}"
-          token    = os.environ.get('CENTRAL_REPO_TOKEN', '')
-
-          def fetch(remote_path, local_dest):
-              url = f"{base_url}/{remote_path}"
-              req = urllib.request.Request(url)
-              if token:
-                req.add_header('Authorization', f'Bearer {token}')
-              try:
-                  with urllib.request.urlopen(req) as resp:
-                      data = resp.read()
-              except urllib.error.HTTPError as e:
-                  print(f"ERROR: could not fetch {url}: {e}", file=sys.stderr)
-                  sys.exit(1)
-              os.makedirs(os.path.dirname(local_dest), exist_ok=True)
-              with open(local_dest, 'wb') as f:
-                  f.write(data)
-
-          # Fetch catalog from central-repo
-          catalog_tmp = '/tmp/aw-catalog.yml'
-          fetch('catalog.yml', catalog_tmp)
-          with open(catalog_tmp) as f:
-              catalog = yaml.safe_load(f)
+          # ── Fetch catalog ───────────────────────────────────────────────────
+          token   = os.environ.get('CENTRAL_REPO_TOKEN', '')
+          cat_url = f"https://raw.githubusercontent.com/{central_repo}/{central_ref}/catalog.yml"
+          req     = urllib.request.Request(cat_url)
+          if token:
+              req.add_header('Authorization', f'Bearer {token}')
+          try:
+              with urllib.request.urlopen(req) as r:
+                  catalog = yaml.safe_load(r.read())
+          except urllib.error.HTTPError as e:
+              print(f"ERROR: could not fetch catalog: {e}", file=sys.stderr)
+              sys.exit(1)
 
           print(f"Central-repo : {central_repo}@{central_ref}")
-          print(f"Catalog      : {len(catalog.get('workflows', {}))} workflows available")
-          print()
+
+          # ── Process each workflow ───────────────────────────────────────────
+          os.makedirs('.github/workflows', exist_ok=True)
 
           for workflow, enabled in config.get('workflows', {}).items():
-              lock_dest = f".github/workflows/{workflow}.lock.yml"
-              md_dest   = f".github/workflows/{workflow}.md"
+              trigger_file = f".github/workflows/{workflow}.yml"
 
               if enabled:
                   entry = catalog.get('workflows', {}).get(workflow)
                   if not entry:
-                      print(
-                          f"ERROR: workflow '{workflow}' is not listed in the central-repo catalog.",
-                          file=sys.stderr,
-                      )
+                      print(f"ERROR: '{workflow}' not in catalog", file=sys.stderr)
                       sys.exit(1)
-                  print(f"  [enable]  {workflow}")
-                  fetch(entry['compiled'], lock_dest)
-                  fetch(entry['source'],   md_dest)
+
+                  trigger_yaml = yaml.dump(
+                      entry['trigger'], default_flow_style=False, sort_keys=False
+                  ).rstrip()
+                  indented = '\n'.join(f"  {l}" for l in trigger_yaml.splitlines())
+                  desc = entry.get('description', workflow).strip().splitlines()[0][:72]
+
+                  content = textwrap.dedent(f"""\
+                      # AUTO-GENERATED by sync-agentic-workflows — DO NOT EDIT
+                      # To disable: set '{workflow}: false' in .github/aw-config.yml
+
+                      name: "{desc}"
+
+                      "on":
+                      {indented}
+
+                      jobs:
+                        run:
+                          uses: {central_repo}/.github/workflows/{workflow}.lock.yml@{central_ref}
+                          secrets: inherit
+                  """)
+
+                  with open(trigger_file, 'w') as f:
+                      f.write(content)
+                  print(f"  [enable]  {workflow}  →  {trigger_file}")
+
               else:
-                  removed = [p for p in [lock_dest, md_dest] if os.path.exists(p)]
-                  for p in removed:
-                      os.remove(p)
-                  status = "removed" if removed else "already absent"
-                  print(f"  [disable] {workflow} ({status})")
+                  if os.path.exists(trigger_file):
+                      os.remove(trigger_file)
+                      print(f"  [disable] {workflow}  (removed)")
+                  else:
+                      print(f"  [disable] {workflow}  (already absent)")
           PYEOF
-          python3 /tmp/aw-sync.py
 
       - name: Commit changes
         run: |
@@ -107,10 +117,8 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add .github/workflows/
           if git diff --staged --quiet; then
-            echo "No workflow changes to commit."
+            echo "No trigger file changes."
           else
-            git commit -m "chore(aw): sync workflows from central-repo
-
-          Synced based on .github/aw-config.yml"
+            git commit -m "chore(aw): sync trigger files from central-repo"
             git push
           fi

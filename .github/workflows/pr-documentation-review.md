@@ -3,6 +3,7 @@ description: Reviews codebase documentation whenever a pull request is opened, c
 on:
   pull_request:
     types: [opened]
+  workflow_call:
 permissions: read-all
 tools:
   github:

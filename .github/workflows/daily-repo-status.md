@@ -8,6 +8,7 @@ description: |
 on:
   schedule: daily
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read
