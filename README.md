@@ -1,57 +1,86 @@
-# Central Agentic Workflows Repository
+# Central Agentic Workflows
 
-This is the **single source of truth** for shared GitHub Agentic Workflows (gh-aw), modelled after [githubnext/agentics](https://github.com/githubnext/agentics).
+Shared GitHub Agentic Workflows (gh-aw) live here. Install them with one command.
 
-Workflows are authored and maintained here. Project repos **install** them with a single CLI command — no scripts, no sync jobs, no secrets.
+## 60-second setup
 
-## Structure
-
-```
-central-repo/
-└── workflows/
-    ├── pr-documentation-review.md
-    └── daily-repo-status.md
-```
-
-## Installing a workflow in a project
+Run this in the target repository:
 
 ```sh
+# One-time: install the CLI extension
 gh extension install github/gh-aw
+
+# Add one workflow from this repository
+gh aw add arthurfvives/central-repo/<workflow-name>
+```
+
+Example:
+
+```sh
 gh aw add arthurfvives/central-repo/pr-documentation-review
 ```
 
-This copies two files into the project's `.github/workflows/`:
+After install, gh-aw writes:
 
+```text
+.github/workflows/<workflow-name>.md
+.github/workflows/<workflow-name>.lock.yml
 ```
-.github/workflows/
-├── pr-documentation-review.md       ← links back to this repo via source:
-└── pr-documentation-review.lock.yml
-```
 
-That's it. No extra infrastructure needed.
+## Install by use case
 
-## Updating installed workflows
+Documentation review on PR open:
 
 ```sh
-# Update one workflow
-gh aw update pr-documentation-review
+gh aw add arthurfvives/central-repo/pr-documentation-review
+```
 
-# Update all workflows in the project
+Manual test coverage review (`/test-review` or eyes reaction):
+
+```sh
+gh aw add arthurfvives/central-repo/test-review
+```
+
+React useEffect policy review on PR changes:
+
+```sh
+gh aw add arthurfvives/central-repo/react-useeffect-review
+```
+
+## Update workflows
+
+Run this in a repository where workflows are installed:
+
+```sh
+# Update one
+gh aw update <workflow-name>
+
+# Update all installed workflows
 gh aw update
 ```
 
-Updates are **explicit** — project owners decide when to adopt a new version.
-
-## Adding a new workflow
-
-1. Create `workflows/<name>.md` with frontmatter + natural language instructions
-2. Commit — `gh aw add` compiles the lock file locally on install.
-
 ## Available workflows
 
-| Name | Description |
-|------|-------------|
-| `pr-documentation-review` | Reviews documentation quality on every opened PR |
-| `daily-repo-status` | Posts a daily GitHub Issue summarising repository activity |
+| Workflow | Trigger | What it does |
+|---|---|---|
+| `pr-documentation-review` | PR opened | Reviews documentation completeness and accuracy |
+| `test-review` | `/test-review`, eyes reaction, workflow_call | Reviews test coverage and test quality |
+| `react-useeffect-review` | PR opened/synchronize/reopened | Reviews `useEffect` usage against Delaware rules |
+
+## Authoring new workflows (maintainers)
+
+1. Add a new markdown workflow file under `workflows/`.
+2. Commit and push.
+3. Consumers install with `gh aw add arthurfvives/central-repo/<workflow-name>`.
+
+## Repository layout
+
+```text
+central-repo/
+└── workflows/
+    ├── pr-documentation-review.md
+    ├── test-review.md
+    └── react-useeffect-review.md
+```
 
 
