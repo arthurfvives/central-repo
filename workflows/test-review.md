@@ -15,7 +15,7 @@ network:
     - node
 safe-outputs:
   add-comment:
-    max: 3
+    max: 2
     hide-older-comments: true
   noop: {}
 ---
