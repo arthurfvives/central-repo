@@ -1,8 +1,8 @@
 ---
 description: Reviews React useEffect usage in pull requests against Delaware house rules, flagging derived-state effects, missing dependencies, and missing cleanup.
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
+  slash_command:
+    name: react-review
   workflow_call:
 permissions: read-all
 tools:
@@ -51,11 +51,12 @@ Prefer alternatives in feedback:
 
 ## Steps
 
-1. Fetch pull request metadata and changed files.
-2. Identify React files in the diff (`*.js`, `*.jsx`, `*.ts`, `*.tsx`) that add or modify `useEffect`.
-3. Read each relevant changed file and inspect each added/modified Effect.
-4. Evaluate every Effect against the Delaware checklist and violations list.
-5. Write one concise review comment with findings and actionable alternatives.
+1. Confirm the trigger context is a pull request. If no PR context is available, use `noop`.
+2. Fetch pull request metadata and changed files.
+3. Identify React files in the diff (`*.js`, `*.jsx`, `*.ts`, `*.tsx`) that add or modify `useEffect`.
+4. Read each relevant changed file and inspect each added/modified Effect.
+5. Evaluate every Effect against the Delaware checklist and violations list.
+6. Write one concise review comment with findings and actionable alternatives.
 
 ## Output Format
 
@@ -67,6 +68,7 @@ Post exactly one pull request comment via `add-comment` with this structure:
 - **⚠️ Rule violations**: Concrete violations with file references and short rationale.
 - **💡 Recommended refactors**: Specific replacement patterns (event handler, render expression, TanStack Query, `useSyncExternalStore`, etc.).
 
+When citing violations, include precise references such as `path/to/file.tsx` and symbol names (or line ranges when obvious from the diff).
 If there are no `useEffect` changes in the PR, use `noop`.
 If there are `useEffect` changes and all pass, still use `add-comment` with a brief approval summary.
 
