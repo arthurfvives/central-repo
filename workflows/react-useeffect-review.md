@@ -7,7 +7,7 @@ on:
 permissions: read-all
 engine:
   id: copilot
-  model: gpt-5-mini
+  model: gemini-3-flash-preview
 tools:
   github:
     toolsets: [pull_requests]
