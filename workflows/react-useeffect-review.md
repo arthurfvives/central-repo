@@ -4,9 +4,7 @@ on:
   slash_command:
     name: react-review
   workflow_call:
-permissions:
-  pull-requests: write
-  contents: read
+permissions: read-all
 engine:
   id: copilot
   model: gpt-5-mini
